@@ -1,0 +1,2144 @@
+\documentclass[a4paper,10.5ptj]{ltjsreport}
+
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{biblatex}
+\usepackage{listings}
+\usepackage{tabularray}
+\usepackage{xcolor}
+\usepackage{xurl}
+\usepackage{hyperref}
+
+% Set table of contents depth
+\setcounter{tocdepth}{1}
+
+% Configure references
+\addbibresource{../card_usersmanual.bib}
+\graphicspath{ {../images/} }
+
+\DefTblrTemplate{contfoot-text}{default}{次ページに続く}
+\DefTblrTemplate{conthead-text}{default}{(続き)}
+
+% Configure listings
+\lstset{
+  basicstyle=\ttfamily,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space}
+}
+\renewcommand{\lstlistingname}{プレーンテキスト}
+
+% Description
+\title{FeliCaカードユーザーズマニュアル (非公式版)}
+\author{切敷 裕大\thanks{アンノウン・テクノロジーズ株式会社}}
+\date{2026年7月24日}
+
+\begin{document}
+
+\maketitle
+
+\section*{おことわり}
+
+内容の確かさには万全を期しておりますが、リバースエンジニアリングの性質上、不正確な結果が含まれている場合がありますので、ご了承ください。
+
+本文書では、特筆ない限り以下が前提です。
+
+\begin{itemize}
+    \item ビット順序は、最下位ビットをビット0とします。
+    \item データ長は、オクテット単位とします。
+\end{itemize}
+
+\tableofcontents
+
+\chapter{はじめに}
+
+FeliCaは、交通系ICカードを筆頭に多くのSF(ストアードフェア)型電子マネーや身分証明書等に使用されている一方、その仕様において最も重要な暗号に関する仕様は非公開とされており、広く知られていません。暗号に関するセキュリティは、公にされ広く専門家が検証してこそ安全性が担保されるものです。このため、本文書ではFeliCaの隠された仕様を明らかにします。本文書は、JIS X 6319-4\cite{jis-x-6319-4-2016}、FeliCaカード ユーザーズマニュアル 抜粋版(以下、U-MAN)\cite{felica-usersmanual}、felica-tool\cite{felica-tool}およびProxmark3\cite{proxmark3}を大いに参考にしています。より詳しい情報を知りたい方はこれらも併せてご確認ください。
+
+\chapter{FeliCaとは}
+
+FeliCaは、ソニー株式会社が開発した非接触型ICカード技術の一つで、NFC Type-Fとも呼ばれます。市場にある実装としてはFeliCa StandardとFeliCa Lite-Sがあります。本文書では、前者を取り扱います。
+
+\chapter{通信プロトコル}
+
+カードとカードリーダとの間の通信プロトコルを説明します。ただし、すべてが公になっている物理層およびデータリンク層の説明は割愛し、アプリケーション層のみを取り扱います。
+
+\section{コマンドパケット}
+
+コマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={コマンドパケットのデータ構造},
+        label={table:felica-command-packet-structure},
+    ]{
+        colspec={|r|r|l|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      \\
+    0x00  & 0x01 & コマンドコード \\
+    0x01  & 可変   & コマンドデータ
+\end{tblr}
+
+\subsection{コマンドコード}
+
+コマンドの種類を識別するための1バイトの値です。
+
+\subsection{コマンドデータ}
+
+コマンドの処理指示を規定するデータで、コマンドごとに形式が異なります。
+
+\section{レスポンスパケット}
+
+レスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={レスポンスパケットのデータ構造},
+        label={table:felica-response-packet-structure},
+    ]{
+        colspec={|r|r|l|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目       \\
+    0x00  & 0x01 & レスポンスコード \\
+    0x01  & 可変   & レスポンスデータ
+\end{tblr}
+
+\subsection{レスポンスコード}
+
+レスポンスの種類を識別するための8ビットの値です。
+
+\subsection{レスポンスデータ}
+
+レスポンスの処理結果を規定するデータで、コマンドごとに形式が異なります。
+
+\section{コマンド一覧}
+
+各コマンドの概要ならびにコマンドコードおよびレスポンスコードを以下に示します。(表\ref{table:felica-command-list})ただし、表中ではコマンドコードをCC、レスポンスコードをRCと表記します。また、まだ知られていないコマンドが存在している可能性があります。
+
+\begin{tblr}[
+        long,
+        caption={コマンド一覧},
+        label={table:felica-command-list},
+    ]{
+        colspec={|l|r|r|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    名称                   & CC   & RC   & 概要                                     \\
+    Polling              & 0x00 & 0x01 & カードリーダがカードを捕捉および特定する                   \\
+    Request Service      & 0x02 & 0x03 & エリアやサービスの存在確認と鍵バージョンを取得する              \\
+    Request Response     & 0x04 & 0x05 & カードの存在とモードを確認する                        \\
+    {Read Without                                                               \\ Encryption} & 0x06 & 0x07 & サービス属性が認証不要のサービスからブロックデータを読み出す \\
+    {Write Without                                                              \\ Encryption} & 0x08 & 0x09 & サービス属性が認証不要のサービスへブロックデータを書き込む \\
+    Search Service Code  & 0x0A & 0x0B & エリアコードとサービスコードを取得する                    \\
+    Request System Code  & 0x0C & 0x0D & カード内に登録されているシステムコードを取得する               \\
+    {Request Block                                                              \\ Information}   & 0x0E & 0x0F & 指定したノードに割り当てられているブロック数を取得する                         \\
+    Authentication1      & 0x10 & 0x11 & カードリーダがカードをDES暗号方式で認証する                \\
+    Authentication2      & 0x12 & 0x13 & カードがカードリーダをDES暗号方式で認証する                \\
+    Read                 & 0x14 & 0x15 & サービス属性が認証必要のサービスからDES暗号方式でブロックデータを読み出す \\
+    Write                & 0x16 & 0x17 & サービス属性が認証必要のサービスへDES暗号方式でブロックデータを書き込む  \\
+    Request Code List    & 0x1A & 0x1B & 指定した親ノードに対するノードのリストを反復的に取得する           \\
+    {Request Block                                                              \\ Information Ex}  & 0x1E & 0x1F & 指定したノードに割り当てられているブロック数と空きブロック数を取得する  \\
+    Set Parameter        & 0x20 & 0x21 & カード通信パラメータを設定する(暗号化方式およびノードコードサイズ)     \\
+    {Get Container                                                              \\ Issue Information} & 0x22 & 0x23 & コンテナの情報(フォーマットバージョンや携帯電話のモデルなど)を取得する \\
+    {Get Area                                                                   \\ Information}       & 0x24 & 0x25 & 指定したエリアに関する情報を取得する \\
+    Get Node Property    & 0x28 & 0x29 & ノードプロパティを取得する                          \\
+    {Get Container                                                              \\ Property} & 0x2E & 0x2F & コンテナプロパティを取得する                          \\
+    Request Service v2   & 0x32 & 0x33 & エリアやサービスの存在確認と鍵バージョンを取得する(AES暗号方式対応)   \\
+    {Internal Authenticate                                                      \\ and Read} & 0x34 & 0x35 & MACつき通信有効サービスに対して内部認証を行いブロックデータを読み出す \\
+    {External Authenticate                                                      \\ and Write} & 0x36 & 0x37 & MACつき通信有効サービスに対して外部認証を行いブロックデータを書き込む \\
+    Get System Status    & 0x38 & 0x39 & システムごとの設定状態を取得する                       \\
+    {Request Product                                                            \\ Information} & 0x3A & 0x3B & 製品情報を取得する \\
+    {Request                                                                    \\ Specification                                                   \\ Version} & 0x3C & 0x3D & カードOSのバージョンを取得する \\
+    Reset Mode           & 0x3E & 0x3F & モードをMode0にリセットする                       \\
+    Authentication1 v2   & 0x40 & 0x41 & カードリーダがカードをAES暗号方式で認証する                \\
+    Authentication2 v2   & 0x42 & 0x43 & カードがカードリーダをAES暗号方式で認証する                \\
+    Read v2              & 0x44 & 0x45 & サービス属性が認証必要のサービスからAES暗号方式でブロックデータを読み出す \\
+    Write v2             & 0x46 & 0x47 & サービス属性が認証必要のサービスへAES暗号方式でブロックデータを書き込む  \\
+    Delete Key           & 0x48 & 0x49 & AES鍵とDES鍵が設定されているノードに対して、DES鍵の使用を停止する  \\
+    Update Random ID     & 0x4C & 0x4D & 乱数化 ID(IDr)を更新する                       \\
+    Get Container ID     & 0x70 & 0x71 & モバイルFeliCaからコンテナIDを取得する                \\
+    Set Node Property    & 0x78 & 0x79 & ノードプロパティを設定する                          \\
+    Register Issue ID    & 0x80 & 0x81 & システムを初期化し発行IDを登録する                     \\
+    Register Area        & 0x82 & 0x83 & エリアを登録する                               \\
+    Register Service     & 0x84 & 0x85 & サービスを登録する                              \\
+    Register Issue ID Ex & 0x86 & 0x87 & システムを初期化し発行IDを登録する                     \\
+    Change System Block  & 0x8E & 0x8F & 発行系コマンドの結果を確定する
+\end{tblr}
+
+\section{製造IDおよび製造パラメーター}
+
+Pollingコマンドのレスポンスデータとして取得できる製造ID(IDm)および製造パラメータ(PMm)を説明します。
+
+\subsection{IDm}
+
+IDmは、カードリーダがカードを識別するためのIDです。カード内に複数のシステムが存在する場合、システムごとにIDmが異なります。
+
+IDmのデータ構造を以下に示します。(表\ref{table:felica-idm-structure})ただし、製造者コードの先頭1バイトの上位4ビットはカード内でのシステム番号を示します。
+
+\begin{tblr}[
+        long,
+        caption={IDmのデータ構造},
+        label={table:felica-idm-structure},
+    ]{
+        colspec={|r|r|l|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      \\
+    0x00  & 0x02 & 製造者コード  \\
+    0x02  & 0x06 & カード識別番号
+\end{tblr}
+
+\subsection{PMm}
+
+PMmのデータ構造を以下に示します。(表\ref{table:felica-pmm-structure})ただし、ROM種別およびIC種別を合わせてICコードといいます。
+
+\begin{tblr}[
+        long,
+        caption={PMmのデータ構造},
+        label={table:felica-pmm-structure},
+    ]{
+        colspec={|r|r|l|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目          \\
+    0x00  & 0x01 & ROM種別       \\
+    0x01  & 0x01 & IC種別        \\
+    0x02  & 0x06 & 最大応答時間パラメータ
+\end{tblr}
+
+\chapter{ファイルシステム}
+
+FeliCaの内部は、システム・エリア・サービス・ブロックという階層構造になっています。システムはエリアを内包し、エリアは子エリアまたはサービスを内包し、サービスはブロックを内包します。いずれも1枚のカードに複数存在することができます。このうち、システム・エリア・サービスはディレクトリのようなメタデータで、ブロックは実際のデータを格納する領域です。これらをまとめてノードと呼びます。ノードにはそれぞれを表すコードがあります。いずれのノードの存在もブロックを消費します。
+
+\section{システム}
+
+システムは、論理的なカードの単位であり、階層構造の最上位にあります。システム(ノード)を表すコードは0xFFFFです。システムには、以下のシステム定義情報が定義されています。
+
+\begin{itemize}
+    \item システムコード
+    \item 発行ID情報
+    \item システム鍵
+    \item システム鍵バージョン
+    \item システムプロパティ
+\end{itemize}
+
+\subsection{システムコード}
+
+システムコードは2バイトの値です。紛らわしいですが、システム(ノード)を表すコードとシステムコードは異なる概念です。システムコードには、例えば以下のようなものがあります。(表\ref{table:felica-system-code-examples})
+
+\begin{tblr}[
+        long,
+        caption={システムコードの例},
+        label={table:felica-system-code-examples},
+    ]{
+        colspec={|r|l|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    システムコード & 名称           \\
+    0x0003  & 鉄道サイバネティクス領域 \\
+    0x80CD  & フリー領域        \\
+    0xFE00  & 共通領域         \\
+    0xFE0F  & 管理領域
+\end{tblr}
+
+\subsection{発行ID情報}
+
+発行ID情報は、各8バイトの発行ID(IDi)と発行パラメータ(PMi)からなります。これは、Authentication2コマンドまたはAuthentication2 v2コマンドで相互認証を成功させるとレスポンスデータから得ることができます。IDiを特定のアルゴリズムで文字列に変換すると、鉄道サイバネティクス規格の交通系ICカードの裏面右下に記載されているID番号になります。
+
+\subsection{システム鍵}
+
+システム鍵は、DES暗号方式では8バイトの値です。AES暗号方式の場合は16バイトの値です。
+
+\subsection{システム鍵バージョン}
+
+システム鍵バージョンは2バイトの値です。
+
+\subsection{システムプロパティ}
+
+詳細不明です。
+
+\subsection{システム切り替え}
+
+カードが、Pollingコマンドを受信したり、現在操作されているシステムのものとは異なるIDm宛のコマンドパケットを受信したりした場合、現在操作されているシステムが切り替わりMode0にリセットされます。ただし、Authentication1、Authentication1 v2または Internal Authenticate and Readコマンドが成功し、システム切り替えが発生した場合にはMode1になります。
+
+\section{エリア}
+
+エリアは、システムまたは少なくとも1つの親エリアに内包されます。エリアには、以下のエリア定義情報が定義されています。
+
+\begin{itemize}
+    \item エリアコード
+    \item エンドサービスコード
+    \item 割り当てブロック数
+    \item エリア鍵
+    \item エリア鍵バージョン
+    \item エリアプロパティ
+\end{itemize}
+
+\subsection{エリアコード}
+
+エリアコードは2バイトの値です。第6ビットから第15ビットがエリア番号、第0ビットから第5ビットがエリア属性(表\ref{table:felica-area-attributes})を示します。エリアコードはカード内におけるエリアの論理的な始点をも示します。
+
+\begin{tblr}[
+        long,
+        caption={エリア属性},
+        label={table:felica-area-attributes},
+    ]{
+        colspec={|l|r|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    エリア属性        & 値        \\
+    子エリア作成可能エリア  & 0b000000 \\
+    子エリア作成不可能エリア & 0b000001
+\end{tblr}
+
+\subsection{エンドサービスコード}
+
+カード内におけるエリアの論理的な終点です。
+
+\subsection{割り当てブロック数}
+
+エリアに割り当てられているブロックの数です。
+
+\subsection{エリア鍵}
+エリア鍵は、DES暗号方式では8バイトの値です。AES暗号方式の場合は16バイトの値です。
+
+\subsection{エリア鍵バージョン}
+
+エリア鍵バージョンは2バイトの値です。
+
+\subsection{エリアプロパティ}
+
+詳細不明です。
+
+\subsection{エリア0}
+
+システムには、必ず領域が0x0000から0xFFFEまでのエリア0が含まれます。
+
+\section{サービス}
+
+サービスは、少なくとも1つのエリアに内包されます。サービスには、以下のサービス定義情報が定義されています。
+
+\begin{itemize}
+    \item サービスコード
+    \item 割り当てブロック数
+    \item サービス鍵
+    \item サービス鍵バージョン
+    \item サービスプロパティ
+\end{itemize}
+
+\subsection{サービスコード}
+
+サービスコードは2バイトの値です。第6ビットから第15ビットがサービス番号、第0ビットから第5ビットがサービス属性(表\ref{table:felica-service-attributes})を示します。サービスコードはカード内におけるサービスの論理的な位置をも示します。
+
+\begin{tblr}[
+        long,
+        caption={サービス属性},
+        label={table:felica-service-attributes},
+    ]{
+        colspec={|l|l|r|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    サービス属性 & アクセス制御             & 値        \\
+    \SetCell[r=4]{l}ランダムサービス
+           & リード/ライトアクセス:認証必要   & 0b001000 \\
+           & リード/ライトアクセス:認証不要   & 0b001001 \\
+           & リードオンリーアクセス:認証必要   & 0b001010 \\
+           & {リードオンリーアクセス:認証不要} & 0b001011 \\
+    \SetCell[r=4]{l}サイクリックサービス
+           & リード/ライトアクセス:認証必要   & 0b001100 \\
+           & リード/ライトアクセス:認証不要   & 0b001101 \\
+           & リードオンリーアクセス:認証必要   & 0b001110 \\
+           & リードオンリーアクセス:認証不要   & 0b001111 \\
+    \SetCell[r=8]{l}パースサービス
+           & ダイレクトアクセス:認証必要     & 0b010000 \\
+           & ダイレクトアクセス:認証不要     & 0b010001 \\
+           & {キャッシュバック/                    \\ デクリメントアクセス:認証必要} & 0b010010 \\
+           & {キャッシュバック/                    \\ デクリメントアクセス:認証不要} & 0b010011 \\
+           & デクリメントアクセス:認証必要    & 0b010100 \\
+           & デクリメントアクセス:認証不要    & 0b010101 \\
+           & リードオンリーアクセス:認証必要   & 0b010110 \\
+           & リードオンリーアクセス:認証不要   & 0b010111
+\end{tblr}
+
+\subsection{割り当てブロック数}
+
+サービスに割り当てられているブロックの数です。
+
+\subsection{サービス鍵}
+サービス鍵は、DES暗号方式では8バイトの値です。AES暗号方式の場合は16バイトの値です。
+
+\subsection{サービス鍵バージョン}
+
+サービス鍵バージョンは2バイトの値です。
+
+\subsection{サービスプロパティ}
+
+リミットパースサービスオプションまたはMACつき通信オプションが搭載された製品でのみ設定されます。
+
+\subsection{オーバーラップサービス}
+
+複数のサービスコードで同じブロック群を管理することをオーバーラップするといい、同一システム内で同一サービス番号をもつサービスをオーバーラップしたサービスをオーバーラップサービスといいます。U-MAN\cite{felica-usersmanual}の「オーバーラップサービス」の節にある、オーバーラップの例を示した図が理解を助けます。
+
+\section{ブロック}
+
+ブロックはカード内の不揮発性メモリにおけるデータの実体を16バイト単位に分割したものです。メタデータを格納する以外のブロックはサービスごとに一定数が割り当てられ、サービスを内包するエリアがその割り当て総数を管理します。U-MAN\cite{felica-usersmanual}の「エリア」の節にある、エリアによるブロック数管理を示した図が理解を助けます。
+
+\chapter{モード}
+
+カードには、Mode0からMode3までの状態(モード)が存在します。カードで実行できるコマンドは、これにより制限されています。電源断の状態から電源が供給されると、Mode0になります。Mode1以上にはDES暗号方式、AES暗号方式またはMACつき通信方式の区分があり、それぞれAuthentication1、Authentication1 v2またはInternal Authenticate and Readコマンドを実行するとMode1に遷移します。
+
+DES暗号方式およびAES暗号方式では、Mode1においてAuthentication2またはAuthentication2 v2コマンドを実行すると該当方式のMode2に遷移します。Mode2では、相互認証が必要なコマンド群(Read, Write, Read v2, Write v2等)を実行できます。発行系コマンドを実行すると、該当方式のMode3に遷移します。
+
+一方、MACつき通信方式にはMode2およびMode3が存在しません。Mode1で実行できるのはExternal Authenticate and Writeコマンドであり、これを実行するとMode0に戻ります。
+
+Mode0以外に遷移すると、カードはPollingコマンドを受け付けなくなります。ただし、システム切り替えのために別システムを指定したPollingコマンドは、いずれのモードでも実行できます。また、いずれのモードにおいてもReset ModeコマンドによりMode0に遷移します。現在のモードは、Request Responseコマンドで確認できます。より詳細な情報は、U-MAN\cite{felica-usersmanual}の「モード」の節を参照してください。
+
+\chapter{コマンド}
+
+コマンドに与えるパラメータとコマンドの詳細について述べます。ただし、コマンドの詳細は、ページ数の都合で一部コマンドを省略します。
+
+\section{ブロックリスト及びブロックリストエレメント}
+
+ブロックリストは、アクセス対象となるサービスおよびブロック番号を特定するための、ブロックリストエレメントの集合です。ブロックリストエレメントには、長さが2バイトのもの(表\ref{table:felica-block-list-elem-2b-structure})と3バイトのもの(表\ref{table:felica-block-list-elem-3b-structure})があります。ただし、表中のオフセットおよび長さはビット単位です。
+
+\begin{tblr}[
+        long,
+        caption={ブロックリストエレメント(2バイト)のデータ構造},
+        label={table:felica-block-list-elem-2b-structure},
+    ]{
+        colspec={|r|r|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ & 項目            \\
+    0     & 1  & 長さフラグ(0b1)    \\
+    1     & 3  & アクセスモード       \\
+    4     & 4  & サービスコードリスト順番  \\
+    8     & 8  & ブロック番号・鍵バージョン
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={ブロックリストエレメント(3バイト)のデータ構造},
+        label={table:felica-block-list-elem-3b-structure},
+    ]{
+        colspec={|r|r|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ & 項目                       \\
+    0     & 1  & 長さフラグ(0b0)               \\
+    1     & 3  & アクセスモード                  \\
+    4     & 4  & サービスコードリスト順番             \\
+    8     & 16 & ブロック番号・鍵バージョン(リトルエンディアン)
+\end{tblr}
+
+\subsection{アクセスモード}
+
+ブロックリストエレメントが対象とするノードへのアクセス方法を指定します。(表\ref{table:felica-ble-access-modes})
+
+\begin{tblr}[
+        long,
+        caption={アクセスモード},
+        label={table:felica-ble-access-modes},
+    ]{
+        colspec={|l|r|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    アクセスモード                 & 値     \\
+    パースサービスへのキャッシュバックアクセス以外 & 0b000 \\
+    パースサービスへのキャッシュバックアクセス   & 0b001 \\
+    鍵変更                     & 0b100
+\end{tblr}
+
+\section{Polling}
+
+Pollingコマンドは、カードリーダがカードを捕捉および特定するためのコマンドです。指定したシステムコードを持つシステムのIDmおよびPMmが取得できます。
+
+\subsection{コマンドパケットのデータ構造}
+
+Pollingコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-polling-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Pollingコマンドパケットのデータ構造},
+        label={table:felica-polling-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目              & 値または備考                                                                                         \\
+    0x00  & 0x01 & コマンドコード         & 0x00                                                                                           \\
+    0x01  & 0x02 & システムコード (x)     & 0x0000 $\leq$ x $\leq$ 0xFFFF (ただし、各バイト0xFFはワイルドカード。) ビッグエンディアン                                \\
+    0x03  & 0x01 & リクエストコード        & 0x00: 要求なし、0x01: システムコード要求、0x02: 通信性能要求                                                        \\
+    0x04  & 0x01 & 応答可能な最大スロット数の指定 & 0x00, 0x01, 0x03, 0x07, 0x0F (詳細はU-MAN\cite{felica-usersmanual}の「Polling」の節にある、タイムスロット規定の表を参照)
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Pollingレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-polling-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Pollingレスポンスパケットのデータ構造},
+        label={table:felica-polling-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目       & 値または備考                                                   \\
+    0x00  & 0x01 & レスポンスコード & 0x01                                                     \\
+    0x01  & 0x08 & IDm      & -                                                        \\
+    0x09  & 0x08 & PMm      & -                                                        \\
+    0x11  & 0x02 & リクエストデータ & コマンドにおけるリクエストコードが0x00以外であり、かつ製品が対応するリクエストコードが指定された場合のみ返送
+\end{tblr}
+
+対応していないリクエストコードを指定した場合、レスポンスパケットにリクエストデータは付加されません。リクエストコードを指定してもリクエストデータが返送されない場合があることを前提に実装してください。
+
+\section{Request Service}
+
+Request Serviceコマンドは、エリアやサービスの存在確認と鍵バージョンを取得するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Request Serviceコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-request-service-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Serviceコマンドパケットのデータ構造},
+        label={table:felica-request-service-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                    \\
+    0x00  & 0x01 & コマンドコード   & 0x02                      \\
+    0x01  & 0x08 & IDm       & -                         \\
+    0x09  & 0x01 & ノード数 (n)  & 0x01 $\leq$ n $\leq$ 0x20 \\
+    0x0A  & 2n   & ノードコードリスト & リトルエンディアン
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Request Serviceレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-request-service-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Serviceレスポンスパケットのデータ構造},
+        label={table:felica-request-service-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目           & 値または備考                            \\
+    0x00  & 0x01 & レスポンスコード     & 0x03                              \\
+    0x01  & 0x08 & IDm          & -                                 \\
+    0x09  & 0x01 & ノード数 (n)     & 0x01 $\leq$ n $\leq$ 0x20         \\
+    0x0A  & 2n   & ノード鍵バージョンリスト & ただし、ノードが存在しない場合には0xFFFF。リトルエンディアン
+\end{tblr}
+
+\section{Request Response}
+
+Request Responseコマンドは、カードの存在とモードを確認するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Request Responseコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-request-response-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Responseコマンドパケットのデータ構造},
+        label={table:felica-request-response-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考 \\
+    0x00  & 0x01 & コマンドコード & 0x04   \\
+    0x01  & 0x08 & IDm     & -
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Request Responseレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-request-response-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Responseレスポンスパケットのデータ構造},
+        label={table:felica-request-response-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目       & 値または備考                    \\
+    0x00  & 0x01 & レスポンスコード & 0x05                      \\
+    0x01  & 0x08 & IDm      & -                         \\
+    0x09  & 0x01 & モード (n)  & 0x00 $\leq$ n $\leq$ 0x03
+\end{tblr}
+
+\section{Read Without Encryption}
+
+Read Without Encryptionコマンドは、サービス属性が認証不要のサービスからブロックデータを読み出すためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Read Without Encryptionコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-rwoe-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Read Without Encryptionコマンドパケットのデータ構造},
+        label={table:felica-rwoe-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ                    & 項目         & 値または備考                                \\
+    0x00  & 0x01                  & コマンドコード    & 0x06                                  \\
+    0x01  & 0x08                  & IDm        & -                                     \\
+    0x09  & 0x01                  & サービス数 (m)  & 0x01 $\leq$ m $\leq$ 0x10             \\
+    0x0A  & 2m                    & サービスコードリスト & リトルエンディアン                             \\
+    -     & 0x01                  & ブロック数 (n)  & 0x01 $\leq$ n $\leq$ 製品の最大読み出し可能ブロック数 \\
+    -     & 2n $\leq$ N $\leq$ 3n & ブロックリスト    & -
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Read Without Encryptionレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-rwoe-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Read Without Encryptionレスポンスパケットのデータ構造},
+        label={table:felica-rwoe-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                                  \\
+    0x00  & 0x01 & レスポンスコード  & 0x07                                    \\
+    0x01  & 0x08 & IDm       & -                                       \\
+    0x09  & 0x01 & ステータスフラグ1 & 0x00: 正常                                \\
+    0x0A  & 0x01 & ステータスフラグ2 & 0x00: 正常                                \\
+    0x0B  & 0x01 & ブロック数 (n) & 0x01 $\leq$ n $\leq$ 製品の最大同時読み出し可能ブロック数 \\
+    0x0C  & 16n  & ブロックデータ   & -
+\end{tblr}
+
+\section{Write Without Encryption}
+
+Write Without Encryptionコマンドは、サービス属性が認証不要のサービスにブロックデータを書き込むためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Write Without Encryptionコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-wwoe-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Write Without Encryptionコマンドパケットのデータ構造},
+        label={table:felica-wwoe-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ                    & 項目         & 値または備考                                  \\
+    0x00  & 0x01                  & コマンドコード    & 0x08                                    \\
+    0x01  & 0x08                  & IDm        & -                                       \\
+    0x09  & 0x01                  & サービス数 (m)  & 0x01 $\leq$ m $\leq$ 0x10               \\
+    0x0A  & 2m                    & サービスコードリスト & リトルエンディアン                               \\
+    -     & 0x01                  & ブロック数 (n)  & 0x01 $\leq$ n $\leq$ 製品の最大同時書き込み可能ブロック数 \\
+    -     & 2n $\leq$ N $\leq$ 3n & ブロックリスト    & -                                       \\
+    -     & 16n                   & ブロックデータ    & -
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Write Without Encryptionレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-wwoe-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Write Without Encryptionレスポンスパケットのデータ構造},
+        label={table:felica-wwoe-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考   \\
+    0x00  & 0x01 & レスポンスコード  & 0x09     \\
+    0x01  & 0x08 & IDm       & -        \\
+    0x09  & 0x01 & ステータスフラグ1 & 0x00: 正常 \\
+    0x0A  & 0x01 & ステータスフラグ2 & 0x00: 正常
+\end{tblr}
+
+\section{Search Service Code}
+
+Search Service Codeコマンドは、エリアコードとサービスコードを取得するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Search Service Codeコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-search-service-code-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Search Service Codeコマンドパケットのデータ構造},
+        label={table:felica-search-service-code-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                                  \\
+    0x00  & 0x01 & コマンドコード   & 0x0A                                    \\
+    0x01  & 0x08 & IDm       & -                                       \\
+    0x09  & 0x02 & ノードインデックス & 0x0000 $\leq$ n $\leq$ 0xFFFF リトルエンディアン
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Search Service Codeレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-search-service-code-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Search Service Codeレスポンスパケットのデータ構造},
+        label={table:felica-search-service-code-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ          & 項目       & 値または備考                                       \\
+    0x00  & 0x01        & レスポンスコード & 0x0B                                         \\
+    0x01  & 0x08        & IDm      & -                                            \\
+    0x09  & 0x02または0x04 & ノードコード   & {2バイト: サービスコード、4バイト: エリアコードおよびエリアエンドサービスコード。 \\ いずれもリトルエンディアン。0xFFFFの場合は該当するノードが存在しないことを示す}
+\end{tblr}
+
+ノードインデックスを0から順に増やしながら本コマンドを実行し、レスポンスのノードコードが0xFFFFとなった時点を終端として、カード内のノードを走査できます。
+
+\section{Request System Code}
+
+Request System Codeコマンドは、カード内に登録されているシステムコードを取得するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Request System Codeコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-request-system-code-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request System Codeコマンドパケットのデータ構造},
+        label={table:felica-request-system-code-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考 \\
+    0x00  & 0x01 & コマンドコード & 0x0C   \\
+    0x01  & 0x08 & IDm     & -
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Request System Codeレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-request-system-code-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request System Codeレスポンスパケットのデータ構造},
+        label={table:felica-request-system-code-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目           & 値または備考                 \\
+    0x00  & 0x01 & レスポンスコード     & 0x0D                   \\
+    0x01  & 0x08 & IDm          & -                      \\
+    0x09  & 0x01 & システムコード数 (n) & -                      \\
+    0x0A  & 2n   & システムコードリスト   & システム0から順に列挙。ビッグエンディアン。
+\end{tblr}
+
+\section{Request Block Information}
+
+Request Block Informationコマンドは、指定したノードに割り当てられているブロック数を取得するためのコマンドです。モバイルFeliCaのみ対応しています。
+
+\subsection{コマンドパケットのデータ構造}
+
+Request Block Informationコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-request-block-information-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Block Informationコマンドパケットのデータ構造},
+        label={table:felica-request-block-information-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目          & 値または備考    \\
+    0x00  & 0x01 & コマンドコード     & 0x0E      \\
+    0x01  & 0x08 & IDm         & -         \\
+    0x09  & 0x01 & ノードコード数 (n) & -         \\
+    0x0A  & 2n   & ノードコードリスト   & リトルエンディアン
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Request Block Informationレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-request-block-information-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Block Informationレスポンスパケットのデータ構造},
+        label={table:felica-request-block-information-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目          & 値または備考                 \\
+    0x00  & 0x01 & レスポンスコード    & 0x0F                   \\
+    0x01  & 0x08 & IDm         & -                      \\
+    0x09  & 0x01 & ブロック情報数 (n) & -                      \\
+    0x0A  & 2n   & ブロック情報リスト   & 各ノードに割り当てられているブロック数を示す
+\end{tblr}
+
+\section{Authentication1}
+
+Authentication1コマンドは、DES方式でカード側認証チャレンジを開始するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Authentication1コマンドパケットのデータ構造は、表\ref{table:felica-auth1-command-packet-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Authentication1レスポンスパケットのデータ構造は、表\ref{table:felica-auth1-response-packet-structure}を参照してください。
+
+\section{Authentication2}
+
+Authentication2コマンドは、DES方式の相互認証を完了するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Authentication2コマンドパケットのデータ構造は、表\ref{table:felica-auth2-command-packet-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Authentication2レスポンスパケットのデータ構造は、表\ref{table:felica-auth2-response-packet-structure}を参照してください。
+
+\section{Read}
+
+Readコマンドは、相互認証後のDESセッションでブロックデータを読み出すためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Readコマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-read-common-command-payload-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Readレスポンスの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-read-common-response-payload-structure}を参照してください。
+
+\section{Write}
+
+Writeコマンドは、相互認証後のDESセッションでブロックデータを書き込むためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Writeコマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-write-common-command-payload-structure}を参照してください。
+アクセスモード0b100(鍵変更)のブロックデータに格納する鍵変更パッケージは、表\ref{table:felica-secure-key-change-package-structure}および同節の生成アルゴリズムを参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Writeレスポンスの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-write-common-response-payload-structure}を参照してください。
+
+\section{Get Node Property}
+
+Get Node Propertyコマンドは、ノードプロパティを取得するためのコマンドです。リミットパースサービスオプションまたはMACつき通信オプションのノードプロパティが取得できます。本コマンドは、一部のAESカード製品およびAES/DESカード製品にのみ搭載されています。
+
+\subsection{コマンドパケットのデータ構造}
+
+Get Node Propertyコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-get-node-property-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Get Node Propertyコマンドパケットのデータ構造},
+        label={table:felica-get-node-property-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                                \\
+    0x00  & 0x01 & コマンドコード   & 0x28                                  \\
+    0x01  & 0x08 & IDm       & -                                     \\
+    0x09  & 0x01 & 取得対象      & 0x00: リミットパースサービス、0x01: MACつき通信有効サービス \\
+    0x0A  & 0x01 & ノード数 (n)  & 0x01 $\leq$ n $\leq$ 0x10             \\
+    0x0B  & 2n   & ノードコードリスト & リトルエンディアン
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Get Node Propertyレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-get-node-property-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Get Node Propertyレスポンスパケットのデータ構造},
+        label={table:felica-get-node-property-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                                    \\
+    0x00  & 0x01 & レスポンスコード  & 0x29                                      \\
+    0x01  & 0x08 & IDm       & -                                         \\
+    0x09  & 0x01 & ステータスフラグ1 & 0x00: 正常                                  \\
+    0x0A  & 0x01 & ステータスフラグ2 & 0x00: 正常                                  \\
+    0x0B  & 0x01 & ノード数 (n)  & ステータスフラグ1が0x00の場合のみ返送                     \\
+    0x0C  & mn   & ノードプロパティ  & {ステータスフラグ1が0x00の場合のみ返送。ノードコードリストの順に列挙される。 \\ 取得対象が0x00のときm=10、0x01のときm=1}
+\end{tblr}
+
+取得対象に0x00(リミットパースサービス)を指定した場合のノードプロパティのデータ構造を以下に示します。(表\ref{table:felica-limited-purse-service-property-structure})
+
+\begin{tblr}[
+        long,
+        caption={リミットパースサービスのノードプロパティのデータ構造},
+        label={table:felica-limited-purse-service-property-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目               & 値または備考                           \\
+    0x00  & 0x01 & リミットパースサービス有効フラグ & 0x01: 有効、0x00: 無効                \\
+    0x01  & 0x04 & 上限値              & リトルエンディアン、2の補数表現。無効の場合は全バイトが0xFF \\
+    0x05  & 0x04 & 下限値              & リトルエンディアン、2の補数表現。無効の場合は全バイトが0xFF \\
+    0x09  & 0x01 & 世代番号             & 無効の場合は0xFF
+\end{tblr}
+
+取得対象に0x01(MACつき通信有効サービス)を指定した場合のノードプロパティは、MACつき通信有効フラグ1バイトのみです。値は0x01が有効、0x00が無効を表します。
+
+\section{Request Service v2}
+
+Request Service v2コマンドは、暗号方式識別子と鍵バージョン情報を取得するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Request Service v2コマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-request-service-v2-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Service v2コマンドパケットのデータ構造},
+        label={table:felica-request-service-v2-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                    \\
+    0x00  & 0x01 & コマンドコード   & 0x32                      \\
+    0x01  & 0x08 & IDm       & -                         \\
+    0x09  & 0x01 & ノード数 (n)  & 0x01 $\leq$ n $\leq$ 0x20 \\
+    0x0A  & 2n   & ノードコードリスト & リトルエンディアン
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Request Service v2レスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-request-service-v2-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Service v2レスポンスパケットのデータ構造},
+        label={table:felica-request-service-v2-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ      & 項目        & 値または備考                                          \\
+    0x00  & 0x01    & レスポンスコード  & 0x33                                            \\
+    0x01  & 0x08    & IDm       & -                                               \\
+    0x09  & 0x01    & ステータスフラグ1 & 0x00: 正常                                        \\
+    0x0A  & 0x01    & ステータスフラグ2 & 0x00: 正常                                        \\
+    0x0B  & 0x01    & 暗号方式識別子   & ステータスフラグ1が0x00の場合のみ返送                           \\
+    0x0C  & 0x01    & ノード数 (n)  & ステータスフラグ1が0x00の場合のみ返送。0x01 $\leq$ n $\leq$ 0x20 \\
+    0x0D  & 2nまたは4n & 鍵バージョンリスト & {ステータスフラグ1が0x00の場合のみ返送。                         \\ 暗号方式識別子が0x41または0x43のときは4nバイト(前半AES, 後半DES)。\\ それ以外は2nバイト}
+\end{tblr}
+
+\section{Get System Status}
+
+Get System Statusコマンドは、システムごとの設定状態を取得するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Get System Statusコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-get-system-status-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Get System Statusコマンドパケットのデータ構造},
+        label={table:felica-get-system-status-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考 \\
+    0x00  & 0x01 & コマンドコード & 0x38   \\
+    0x01  & 0x08 & IDm     & -      \\
+    0x09  & 0x02 & 予約領域    & 0x0000
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Get System Statusレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-get-system-status-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Get System Statusレスポンスパケットのデータ構造},
+        label={table:felica-get-system-status-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考   \\
+    0x00  & 0x01 & レスポンスコード  & 0x39     \\
+    0x01  & 0x08 & IDm       & -        \\
+    0x09  & 0x01 & ステータスフラグ1 & 0x00: 正常 \\
+    0x0A  & 0x01 & ステータスフラグ2 & 0x00: 正常 \\
+    0x0B  & 0x01 & フラグ       & 詳細不明     \\
+    0x0C  & 0x01 & データ長 (n)  & -        \\
+    0x0D  & n    & データ       & 詳細不明
+\end{tblr}
+
+フラグおよびデータの意味は詳細不明です。
+
+\section{Request Specification Version}
+
+Request Specification Versionコマンドは、カードOSのバージョンを取得するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Request Specification Versionコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-request-specification-version-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Specification Versionコマンドパケットのデータ構造},
+        label={table:felica-request-specification-version-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考 \\
+    0x00  & 0x01 & コマンドコード & 0x3C   \\
+    0x01  & 0x08 & IDm     & -      \\
+    0x09  & 0x02 & 予約領域    & 0x0000
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Request Specification Versionレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-request-specification-version-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Request Specification Versionレスポンスパケットのデータ構造},
+        label={table:felica-request-specification-version-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目            & 値または備考                          \\
+    0x00  & 0x01 & レスポンスコード      & 0x3D                            \\
+    0x01  & 0x08 & IDm           & -                               \\
+    0x09  & 0x01 & ステータスフラグ1     & 0x00: 正常                        \\
+    0x0A  & 0x01 & ステータスフラグ2     & 0x00: 正常                        \\
+    0x0B  & 0x01 & フォーマットバージョン   & 0x00固定。ステータスフラグ1が0x00の場合のみ返送    \\
+    0x0C  & 0x02 & 基本バージョン       & ステータスフラグ1が0x00の場合のみ返送。リトルエンディアン \\
+    0x0E  & 0x01 & オプション数 (m)    & ステータスフラグ1が0x00の場合のみ返送           \\
+    0x0F  & 2m   & オプションバージョンリスト & ステータスフラグ1が0x00の場合のみ返送。リトルエンディアン
+\end{tblr}
+
+オプションバージョンリストの各要素の割り当てを以下に示します。(表\ref{table:felica-option-version-list})
+
+\begin{tblr}[
+        long,
+        caption={オプションバージョンリストの割り当て},
+        label={table:felica-option-version-list},
+    ]{
+        colspec={|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    位置      & オプション                                          \\
+    D0-D1   & DESオプション                                       \\
+    D2-D3   & 0x00, 0x00 (モバイルFeliCaでは固有のバージョンが設定されている場合がある) \\
+    D4-D5   & 拡張オーバーラップオプション                                 \\
+    D6-D7   & リミットパースサービスオプション                               \\
+    D8-D9   & MACつき通信オプション                                   \\
+    D10-D11 & 乱数化IDオプション
+\end{tblr}
+
+基本バージョンおよび各オプションバージョンは、いずれも2バイトのデータです。上位4ビットは0b1000固定であり、残りの12ビットがBCD形式のバージョン値を表します。例えば、バージョン5.0.0は0x500となります。オプションの有無およびバージョンの値は製品ごとに異なります。
+
+\section{Reset Mode}
+
+Reset Modeコマンドは、モードをMode0にリセットするためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Reset Modeコマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-reset-mode-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Reset Modeコマンドパケットのデータ構造},
+        label={table:felica-reset-mode-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考 \\
+    0x00  & 0x01 & コマンドコード & 0x3E   \\
+    0x01  & 0x08 & IDm     & -      \\
+    0x09  & 0x02 & 予約領域    & 0x0000
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Reset Modeレスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-reset-mode-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Reset Modeレスポンスパケットのデータ構造},
+        label={table:felica-reset-mode-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考   \\
+    0x00  & 0x01 & レスポンスコード  & 0x3F     \\
+    0x01  & 0x08 & IDm       & -        \\
+    0x09  & 0x01 & ステータスフラグ1 & 0x00: 正常 \\
+    0x0A  & 0x01 & ステータスフラグ2 & 0x00: 正常
+\end{tblr}
+
+\section{Authentication1 v2}
+
+Authentication1 v2コマンドは、AES方式でカード側認証チャレンジを開始するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Authentication1 v2コマンドパケットのデータ構造は、表\ref{table:felica-auth1v2-command-packet-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Authentication1 v2レスポンスパケットのデータ構造は、表\ref{table:felica-auth1v2-response-packet-structure}を参照してください。
+
+\section{Authentication2 v2}
+
+Authentication2 v2コマンドは、AES方式の相互認証を完了するためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Authentication2 v2コマンドパケットのデータ構造は、表\ref{table:felica-auth2v2-command-packet-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Authentication2 v2レスポンスパケットのデータ構造は、表\ref{table:felica-auth2v2-response-packet-structure}を参照してください。
+
+\section{Read v2}
+
+Read v2コマンドは、相互認証後のAESセッションでブロックデータを読み出すためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Read v2コマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-read-common-command-payload-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Read v2レスポンスの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-read-common-response-payload-structure}を参照してください。
+
+\section{Write v2}
+
+Write v2コマンドは、相互認証後のAESセッションでブロックデータを書き込むためのコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Write v2コマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-write-common-command-payload-structure}を参照してください。
+鍵変更(アクセスモード0b100)はWrite v2では有効ではありません。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Write v2レスポンスの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-write-common-response-payload-structure}を参照してください。
+
+\section{Register Issue ID}
+
+Register Issue IDコマンドは、発行ID関連情報を登録するための発行系セキュアコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Register Issue IDコマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-register-issue-id-command-payload-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Register Issue IDレスポンスの暗号化前内部ペイロードは、ステータスフラグ1/2に加え、成功時のみ残りブロック数(2バイト)を返します。
+
+\section{Register Area}
+
+Register Areaコマンドは、エリアを登録するための発行系セキュアコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Register Areaコマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-register-area-command-payload-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Register Areaレスポンスの暗号化前内部ペイロードは、ステータスフラグ1/2の2バイトです。
+
+\section{Register Service}
+
+Register Serviceコマンドは、サービスを登録するための発行系セキュアコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Register Serviceコマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-register-service-command-payload-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Register Serviceレスポンスの暗号化前内部ペイロードは、ステータスフラグ1/2に加え、成功時のみ残りブロック数(2バイト)を返します。
+
+\section{Change System Block}
+
+Change System Blockコマンドは、発行系コマンドの結果を確定するための発行系セキュアコマンドです。
+
+\subsection{コマンドパケットのデータ構造}
+
+Change System Blockコマンドの暗号化前内部ペイロード構造は、表\ref{table:felica-secure-change-system-block-command-payload-structure}を参照してください。
+
+\subsection{レスポンスパケットのデータ構造}
+
+Change System Blockレスポンスの暗号化前内部ペイロードは、ステータスフラグ1/2の2バイトです。
+
+\section{ステータスフラグ}
+
+ステータスフラグは、コマンド処理の結果を表す値で、ステータスフラグ1とステータスフラグ2からなります。
+
+\subsection{ステータスフラグ1}
+
+ステータスフラグ1は、コマンド処理の成否やエラーが発生したブロック位置またはサービス位置を示します。(表\ref{table:felica-status-flag-1})
+
+\begin{tblr}[
+        long,
+        caption={ステータスフラグ1の値と意味},
+        label={table:felica-status-flag-1},
+    ]{
+        colspec={|r|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    値    & 意味                                        \\
+    0x00 & 正常終了                                      \\
+    0xFF & コマンドパケットにリストを含まないコマンドでのエラーまたはリストに依存しないエラー \\
+    上記以外 & エラーが発生したリスト上の位置
+\end{tblr}
+
+エラーが発生した位置の表現形式は製品によって2種類あり、いずれであるかはステータスフラグ1の値だけでは判別できません。(表\ref{table:felica-status-flag-1-formats})例えば、ブロックリストの10番目に指定したノードでエラーが発生した場合、順番形式では0x0Aを、ビットマップ形式では0x02を返します。
+
+\begin{tblr}[
+        long,
+        caption={ステータスフラグ1におけるエラー位置の表現形式},
+        label={table:felica-status-flag-1-formats},
+    ]{
+        colspec={|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    形式       & 内容                                                                                                        \\
+    順番形式     & エラーが発生したブロックリストまたはサービスコードリスト上の位置(1始まり)をそのまま設定する                                                           \\
+    ビットマップ形式 & 各ビットがリスト上の位置に対応し、1がエラーあり、0がエラーなしを表す。ビット0が1番目または9番目、ビット1が2番目または10番目、以下同様にビット6が7番目または15番目に対応し、ビット7は8番目に対応する
+\end{tblr}
+
+\subsection{ステータスフラグ2}
+
+ステータスフラグ2は、エラーの詳細内容を示します。(表\ref{table:felica-status-flag-2})また、すべての製品で共通の仕様ではない「カード固有仕様」があります。(表\ref{table:felica-status-flag-2-ex})
+
+\begin{tblr}[
+        long,
+        caption={ステータスフラグ2の値と意味},
+        label={table:felica-status-flag-2},
+    ]{
+        colspec={|r|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    値    & 意味                                                      \\
+    0x00 & 正常終了                                                    \\
+    0x01 & パースのデクリメント時に、計算結果がゼロ未満になるまたはキャッシュバック時に計算結果が4バイトを超える数になる \\
+    0x02 & パースのキャッシュバック時に、指定されたデータがキャッシュバックデータの値を超えている             \\
+    0x03 & リミットパースサービスの書き込み時に、パースデータが上限値と下限値との間に入らない               \\
+    0x70 & メモリ異常(致命的エラー)                                           \\
+    0x71 & メモリ書き換え回数が上限を超えている(警告であり、書き込み処理は行われる)
+\end{tblr}
+
+0x71は警告であるため、書き込み処理自体は実行されます。書き換え回数の上限値は製品ごとに異なり、このときステータスフラグ1が0x00となる製品と0xFFとなる製品があります。
+
+\begin{tblr}[
+        long,
+        caption={ステータスフラグ2の値と意味(カード固有仕様)},
+        label={table:felica-status-flag-2-ex},
+    ]{
+        colspec={|r|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    値    & 意味                                                                       \\
+    0xA1 & コマンドで指定されたサービス数またはノード数が規定値の範囲外である                                        \\
+    0xA2 & コマンドで指定されたブロック数が製品規定値の範囲外である                                             \\
+    0xA3 & ブロックリストエレメントで指定されたサービスコードリスト順番が、コマンドで指定されたサービス数または相互認証時に指定したサービス数の範囲外である \\
+    0xA4 & コマンドで指定されたエリアコードのエリア属性またはサービスコードのサービス属性が誤っている                            \\
+    0xA5 & コマンドで指定されたエリアまたはサービスにアクセスできない、またはコマンドで指定されたパラメーターが成功条件を満たしていない           \\
+    0xA6 & ブロックリストエレメントで指定されたサービスコードリスト順番で指定されたアクセス先またはノードコードリストで指定されたノードが存在しない     \\
+    0xA7 & ブロックリストエレメントで指定されたアクセスモードが誤っている                                          \\
+    0xA8 & ブロックリストエレメントで指定されたブロック番号がサービスに割り当てられているブロック数を超えている                       \\
+    0xA9 & 発行コマンドにおいて書き込みに失敗した                                                      \\
+    0xAA & 鍵変更に失敗した                                                                 \\
+    0xAB & 発行コマンドにおいてパッケージパリティまたはパッケージMACが不正である                                     \\
+    0xAC & 発行コマンドにおいてパラメーターが不正である                                                   \\
+    0xAD & 登録しようとしたサービスがすでに存在している                                                   \\
+    0xAE & 発行コマンドにおいてシステムコードが不正である                                                  \\
+    0xAF & コマンドで指定されたサイクリックサービスへの同時書き込みブロック数がサービスに割り当てられているブロック数を超えている              \\
+    0xC0 & 発行コマンドにおいてパッケージ識別子が不正である                                                 \\
+    0xC1 & 発行コマンドにおいてパッケージ内とパッケージ外のパラメータが不一致である                                     \\
+    0xC2 & 発行コマンドが無効化されている                                                          \\
+    0xC3 & コマンドで指定されたノードの属性が誤っている
+\end{tblr}
+
+\chapter{相互認証およびセキュアメッセージングアルゴリズム}
+
+\section{Authentication1 / Authentication2 (DES)}
+
+\subsection{コマンドパケットのデータ構造}
+
+Authentication1コマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-auth1-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication1コマンドパケットのデータ構造},
+        label={table:felica-auth1-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目         & 値または備考    \\
+    0x00  & 0x01 & コマンドコード    & 0x10      \\
+    0x01  & 0x08 & IDm        & -         \\
+    0x09  & 0x01 & エリア数 (a)   & -         \\
+    0x0A  & 2a   & エリアコードリスト  & リトルエンディアン \\
+    -     & 0x01 & サービス数 (s)  & -         \\
+    -     & 2s   & サービスコードリスト & リトルエンディアン \\
+    -     & 0x08 & チャレンジ1A    & 8バイト
+\end{tblr}
+
+Authentication2コマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-auth2-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication2コマンドパケットのデータ構造},
+        label={table:felica-auth2-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考 \\
+    0x00  & 0x01 & コマンドコード & 0x12   \\
+    0x01  & 0x08 & IDm     & -      \\
+    0x09  & 0x08 & チャレンジ2B & 8バイト
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Authentication1レスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-auth1-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication1レスポンスパケットのデータ構造},
+        label={table:felica-auth1-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目       & 値または備考 \\
+    0x00  & 0x01 & レスポンスコード & 0x11   \\
+    0x01  & 0x08 & IDm      & -      \\
+    0x09  & 0x08 & チャレンジ1B  & 8バイト   \\
+    0x11  & 0x08 & チャレンジ2A  & 8バイト
+\end{tblr}
+
+Authentication2レスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-auth2-response-packet-structure})本レスポンスはIDmを含まず、レスポンスコードに続く部分の全体が暗号化されています。
+
+\begin{tblr}[
+        long,
+        caption={Authentication2レスポンスパケットのデータ構造},
+        label={table:felica-auth2-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目       & 値または備考                                                                                                      \\
+    0x00  & 0x01 & レスポンスコード & 0x13                                                                                                        \\
+    0x01  & 0x20 & 暗号化ペイロード & 乱数$R_2$を鍵とするDES-CBC(IV=0)で暗号化されている。復号後の構造は表\ref{table:felica-auth2-response-decrypted-payload-structure}を参照
+\end{tblr}
+
+復号後のペイロードのデータ構造を以下に示します。(表\ref{table:felica-auth2-response-decrypted-payload-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication2レスポンスの復号後ペイロードのデータ構造},
+        label={table:felica-auth2-response-decrypted-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目               & 値または備考              \\
+    0x00  & 0x02 & トランザクション番号 (TN)  & リトルエンディアン           \\
+    0x02  & 0x06 & トランザクションID (TID) & 乱数$R_1$の後半6バイトと一致する \\
+    0x08  & 0x08 & 発行ID (IDi)       & -                   \\
+    0x10  & 0x08 & 発行パラメータ (PMi)    & -                   \\
+    0x18  & 0x08 & MAC              & 先行する24バイトに対して算出される
+\end{tblr}
+
+\subsection{DES相互認証アルゴリズム}
+
+DES相互認証に用いる主要パラメータは以下で導出します。
+
+\begin{itemize}
+    \item システム鍵を$K_{\mathrm{sys}}$、エリア鍵列を$K_{\mathrm{area},i}$、サービス鍵列を$K_{\mathrm{srv},j}$とすると、
+          \[
+              G_0 = K_{\mathrm{sys}},\quad
+              G_i = \mathrm{DES}_{K_{\mathrm{area},i}}(G_{i-1})
+          \]
+          \[
+              K_{\mathrm{group}} = G_m,\quad
+              U_0 = K_{\mathrm{group}},\quad
+              U_j = \mathrm{DES}_{K_{\mathrm{srv},j}}(U_{j-1}),\quad
+              K_{\mathrm{user}} = U_n
+          \]
+          でグループサービス鍵$K_{\mathrm{group}}$とユーザサービス鍵$K_{\mathrm{user}}$を得ます。
+    \item IDmを8バイトベクトルとし、
+          \[
+              L = K_{\mathrm{group}} \oplus IDm
+          \]
+          \[
+              \alpha = \mathrm{DES}_{L}(K_{\mathrm{user}}),\quad
+              \beta  = \mathrm{DES}_{\alpha}(L)
+          \]
+          を計算します。
+    \item 2-key 3DES(鍵順$K_1$-$K_2$-$K_1$)で乱数を交換します。$R_1,R_2$を乱数とすると、
+          \[
+              C_{1A} = \mathrm{3DES}_{\alpha,L}(R_1),\quad
+              C_{1B} = \mathrm{3DES}_{L,\beta}(R_1)
+          \]
+          \[
+              C_{2A} = \mathrm{3DES}_{L,\beta}(R_2),\quad
+              C_{2B} = \mathrm{3DES}_{\alpha,L}(R_2)
+          \]
+          となります。
+    \item Authentication2の平文は
+          \[
+              \mathrm{TN}(2)\ \|\ \mathrm{TID}(6)\ \|\ \mathrm{IDi}(8)\ \|\ \mathrm{PMi}(8)
+          \]
+          です。ここでTIDは$R_1$の後半6バイトを用います。発行ID情報として用いるデータは後半16バイトの$\mathrm{IDi}(8)\ \|\ \mathrm{PMi}(8)$です。
+\end{itemize}
+
+\section{Authentication1 v2 / Authentication2 v2 (AES)}
+
+\subsection{コマンドパケットのデータ構造}
+
+Authentication1 v2コマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-auth1v2-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication1 v2コマンドパケットのデータ構造},
+        label={table:felica-auth1v2-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目           & 値または備考    \\
+    0x00  & 0x01 & コマンドコード      & 0x40      \\
+    0x01  & 0x08 & IDm          & -         \\
+    0x09  & 0x01 & オペレーションパラメータ & -         \\
+    0x0A  & 0x01 & ノード数 (n)     & -         \\
+    0x0B  & 2n   & ノードコードリスト    & リトルエンディアン \\
+    -     & 0x10 & チャレンジ1A      & 16バイト
+\end{tblr}
+
+Authentication2 v2コマンドパケットのデータ構造を以下に示します。(表\ref{table:felica-auth2v2-command-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication2 v2コマンドパケットのデータ構造},
+        label={table:felica-auth2v2-command-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考 \\
+    0x00  & 0x01 & コマンドコード & 0x42   \\
+    0x01  & 0x08 & IDm     & -      \\
+    0x09  & 0x10 & チャレンジ2B & 16バイト
+\end{tblr}
+
+\subsection{レスポンスパケットのデータ構造}
+
+Authentication1 v2レスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-auth1v2-response-packet-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication1 v2レスポンスパケットのデータ構造},
+        label={table:felica-auth1v2-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目       & 値または備考 \\
+    0x00  & 0x01 & レスポンスコード & 0x41   \\
+    0x01  & 0x08 & IDm      & -      \\
+    0x09  & 0x10 & チャレンジ1B  & 16バイト  \\
+    0x19  & 0x10 & チャレンジ2A  & 16バイト  \\
+    0x29  & 0x04 & チャレンジ3C  & 4バイト
+\end{tblr}
+
+Authentication2 v2レスポンスパケットのデータ構造を以下に示します。(表\ref{table:felica-auth2v2-response-packet-structure})本レスポンスもIDmを含みません。トランザクション番号のみ平文で、ペイロードとMACが暗号化されています。
+
+\begin{tblr}[
+        long,
+        caption={Authentication2 v2レスポンスパケットのデータ構造},
+        label={table:felica-auth2v2-response-packet-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目              & 値または備考                                                                                          \\
+    0x00  & 0x01 & レスポンスコード        & 0x43                                                                                            \\
+    0x01  & 0x02 & トランザクション番号 (TN) & リトルエンディアン。暗号化されない                                                                               \\
+    0x03  & 0x10 & 暗号化ペイロード        & AES-128-OFBで暗号化されている。復号後の構造は表\ref{table:felica-auth2v2-response-decrypted-payload-structure}を参照 \\
+    0x13  & 0x08 & 暗号化MAC          & 同じOFBストリームの後段で暗号化されている
+\end{tblr}
+
+復号後のペイロードのデータ構造を以下に示します。(表\ref{table:felica-auth2v2-response-decrypted-payload-structure})
+
+\begin{tblr}[
+        long,
+        caption={Authentication2 v2レスポンスの復号後ペイロードのデータ構造},
+        label={table:felica-auth2v2-response-decrypted-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目            & 値または備考 \\
+    0x00  & 0x08 & 発行ID (IDi)    & -      \\
+    0x08  & 0x08 & 発行パラメータ (PMi) & -
+\end{tblr}
+
+\subsection{AES相互認証アルゴリズム}
+
+AES相互認証に用いる主要パラメータは以下で導出します。
+
+\begin{itemize}
+    \item 16バイト定数を$I_0 = (01\ 01\ 00\cdots00\ 80)$、ノード鍵列を$K_{\mathrm{node},j}$とすると、
+          \[
+              S_0 = I_0,\quad
+              S_j = \mathrm{AES}_{K_{\mathrm{node},j}}(S_{j-1}),\quad
+              K_{\mathrm{group}} = S_n
+          \]
+          でグループ鍵$K_{\mathrm{group}}$を得ます。
+    \item グループ鍵$K_{\mathrm{group}}$、個別化コード$K_{\mathrm{ind}}$として
+          \[
+              H = K_{\mathrm{group}} \oplus K_{\mathrm{ind}}
+          \]
+          を計算します。
+    \item 16バイトコンテキストブロック$B(\mathrm{prefix},IDm)$を
+          \[
+              B[0..1]=\mathrm{prefix},\
+              B[2..5]=0,\
+              B[6..13]=IDm,\
+              B[14..15]=0x01\ 0x00
+          \]
+          で定義し、
+          \[
+              \alpha = \mathrm{AES}_{H}(B([0x01,0x02],IDm))
+          \]
+          \[
+              \beta  = \mathrm{AES}_{H}(B([0x02,0x02],IDm))
+          \]
+          を得ます。
+    \item チャレンジ3C(4バイト)から
+          \[
+              \beta' = \beta \oplus (C_{3C}\ \|\ 0x00^{12})
+          \]
+          を作り、
+          \[
+              C_{1A}=\mathrm{AES}_{\alpha}(R_1),\
+              C_{1B}=\mathrm{AES}_{\beta'}(R_1),\
+              C_{2A}=\mathrm{AES}_{\beta'}(R_2),\
+              C_{2B}=\mathrm{AES}_{\alpha}(R_2)
+          \]
+          で認証値を生成・検証します。
+    \item セキュアメッセージングで使うTIDは$R_1$から導出し、
+          \[
+              \mathrm{TID}=R_1[2..7]
+          \]
+          (6バイト、先頭を0として2バイト目から7バイト目)とします。
+    \item Authentication2 v2レスポンスの復号後ペイロードは
+          \[
+              \mathrm{IDi}(8)\ \|\ \mathrm{PMi}(8)
+          \]
+          です。
+    \item Authentication2 v2成功後、$R_2$からセッション鍵を導出します。
+          \[
+              K_{\mathrm{enc}}=\mathrm{AES}_{R_2}(01\ 03\ 00\cdots00\ 01\ 00)
+          \]
+          \[
+              K_{\mathrm{mac}}=\mathrm{AES}_{R_2}(02\ 03\ 00\cdots00\ 01\ 00)
+          \]
+\end{itemize}
+
+\section{セキュアRead/Writeコマンドフォーマット}
+
+Read, Write, Read v2, Write v2は、暗号化されたセキュアフレーム内部に同一形式の内部ペイロードを格納します。差分は暗号方式のみです。
+
+\begin{tblr}[
+        long,
+        caption={セキュアRead/Write 4コマンドの差分},
+        label={table:felica-secure-read-write-command-diff},
+    ]{
+        colspec={|l|l|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    コマンド     & 暗号方式 & ペイロード構造                                                                                                                                          \\
+    Read     & DES  & Read系共通(表\ref{table:felica-secure-read-common-command-payload-structure}および表\ref{table:felica-secure-read-common-response-payload-structure})    \\
+    Read v2  & AES  & Read系共通(表\ref{table:felica-secure-read-common-command-payload-structure}および表\ref{table:felica-secure-read-common-response-payload-structure})    \\
+    Write    & DES  & Write系共通(表\ref{table:felica-secure-write-common-command-payload-structure}および表\ref{table:felica-secure-write-common-response-payload-structure}) \\
+    Write v2 & AES  & Write系共通(表\ref{table:felica-secure-write-common-command-payload-structure}および表\ref{table:felica-secure-write-common-response-payload-structure})
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Read系コマンド(Read/Read v2)内部ペイロードのデータ構造},
+        label={table:felica-secure-read-common-command-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ    & 項目        & 値または備考                                  \\
+    0x00  & 0x01  & ブロック数 (n) & 0x01 $\leq$ n $\leq$ 製品の最大同時読み出し可能ブロック数 \\
+    0x01  & 2n〜3n & ブロックリスト   & ブロックリストエレメントの2バイト形式または3バイト形式
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Read系レスポンス(Read/Read v2)内部ペイロードのデータ構造},
+        label={table:felica-secure-read-common-response-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                \\
+    0x00  & 0x01 & ステータスフラグ1 & 0x00: 正常              \\
+    0x01  & 0x01 & ステータスフラグ2 & 0x00: 正常              \\
+    0x02  & 0x01 & ブロック数 (n) & ステータスフラグ1が0x00の場合のみ返送 \\
+    0x03  & 16n  & ブロックデータ   & ステータスフラグ1が0x00の場合のみ返送
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Write系コマンド(Write/Write v2)内部ペイロードのデータ構造},
+        label={table:felica-secure-write-common-command-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ    & 項目        & 値または備考                                  \\
+    0x00  & 0x01  & ブロック数 (n) & 0x01 $\leq$ n $\leq$ 製品の最大同時書き込み可能ブロック数 \\
+    0x01  & 2n〜3n & ブロックリスト   & ブロックリストエレメントの2バイト形式または3バイト形式            \\
+    可変    & 16n   & ブロックデータ   & 16バイト×n
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Write系レスポンス(Write/Write v2)内部ペイロードのデータ構造},
+        label={table:felica-secure-write-common-response-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考   \\
+    0x00  & 0x01 & ステータスフラグ1 & 0x00: 正常 \\
+    0x01  & 0x01 & ステータスフラグ2 & 0x00: 正常
+\end{tblr}
+
+\subsection{DES鍵変更パッケージの生成と使用方法}
+
+WriteコマンドでDES鍵変更を行う場合、ブロックリストエレメントのアクセスモードを0b100(鍵変更)に設定し、ブロックデータには16バイトの鍵変更パッケージを格納します。
+
+\begin{tblr}[
+        long,
+        caption={鍵変更パッケージ(16バイト)のデータ構造},
+        label={table:felica-secure-key-change-package-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目         & 値または備考             \\
+    0x00  & 0x08 & Parameter1 & 新鍵バージョン情報を含む暗号ブロック \\
+    0x08  & 0x08 & Parameter2 & 新鍵本体を含む暗号ブロック
+\end{tblr}
+
+親鍵を$K_{\mathrm{parent}}$、旧鍵を$K_{\mathrm{old}}$、新鍵を$K_{\mathrm{new}}$、新鍵バージョンを$v$とします。まず、8バイトのバージョンブロック$V$を
+\[
+    V = 00\ 00\ 00\ 00\ 00\ 00\ v_{\mathrm{LE},0}\ v_{\mathrm{LE},1}
+\]
+で作成し、次を計算します。
+\[
+    P_1 = \mathrm{DES}_{K_{\mathrm{parent}}}\Bigl(
+    \mathrm{DES}_{K_{\mathrm{old}}}\bigl(
+    \mathrm{DES}_{K_{\mathrm{new}}}(V)\bigr)\Bigr)
+\]
+\[
+    P_2 = \mathrm{DES}_{K_{\mathrm{parent}}}\Bigl(
+    \mathrm{DES}_{K_{\mathrm{old}}}(K_{\mathrm{new}})\Bigr)
+\]
+\[
+    \mathrm{KeyChangePackage} = P_1\ \|\ P_2
+\]
+
+使用時は、鍵変更対象ごとに次を1組としてWriteコマンドに渡します。
+\begin{itemize}
+    \item ブロックリストエレメント: アクセスモード=0b100、ブロック番号・鍵バージョン=$v$、サービスコードリスト順番=対象サービス
+    \item ブロックデータ(16バイト): 上記$\mathrm{KeyChangePackage}$
+\end{itemize}
+
+複数鍵を同時に変更する場合は、ブロックリストとブロックデータの順序を一致させて並べます。失敗時はステータスフラグ2として、例えば0xAA(鍵変更失敗)や0xAB(パッケージMAC異常)が返ることがあります。
+
+\subsection{DESセキュアメッセージング}
+
+DESセッションでは、暗号化前ペイロードを
+\[
+    P = \mathrm{TN}(2,\mathrm{LE})\ \|\ \mathrm{TID}(6)\ \|\ \mathrm{CommandPayload}
+\]
+とし、任意の方式で8バイト境界へパディングした$P'$にMACを付与してDES-CBC(IV=0)で暗号化します。
+
+MACは次で計算します。
+\[
+    M_0 = [\mathrm{Len},\ \mathrm{Code},\ 0,\ 0,\ 0,\ 0,\ 0,\ 0]
+\]
+\[
+    M_i = \mathrm{DES}_{B_i}(M_{i-1})
+\]
+ここで$B_i$は$P'$の8バイトブロック列、$\mathrm{Len}=2+|P'|+8$です。最終値$M_n$をMAC(8バイト)として付与します。
+
+応答は復号後にMAC検証し、末尾8バイトのMACを除去した後にパディングを除去します。さらにTID一致とTN単調増加を検証します。
+
+\subsection{AES-128セキュアメッセージング}
+
+AESセッションでは、送信データを
+\[
+    \mathrm{TN}(2,\mathrm{LE})\ \|\ \mathrm{EncPayload}\ \|\ \mathrm{EncMAC}(8)
+\]
+とします。PayloadそのものはOFBで暗号化し、MACも同じOFBストリームの後段で暗号化します。
+
+初期ベクトルIV(16バイト)は次で構成します。
+\[
+    IV[0]=0x01,\ IV[1]=\mathrm{FrameLen},\ IV[2]=\mathrm{Code},
+\]
+\[
+    IV[3..4]=\mathrm{TN},\ IV[5..10]=\mathrm{TID},
+\]
+\[
+    IV[11..13]=\mathrm{C_{3C}}[1..3],\
+    IV[14..15]=0
+\]
+
+MAC平文はAES-CMACで計算し、先頭8バイトを使用します。
+\[
+    B_0[0]=0x19,\ B_0[1..13]=IV[1..13],\ B_0[14..15]=|Payload|_{\mathrm{BE16}}
+\]
+\[
+    MAC = \mathrm{CMAC}_{K_{\mathrm{mac}}}(B_0\ \|\ Payload)[0..7]
+\]
+
+OFB暗号化時、Payload長が16の倍数でない場合は次の16バイト境界までキーストリームを消費してからMACを暗号化します。
+
+\section{DES発行系セキュアコマンドフォーマット}
+
+Register Issue ID, Register Area, Register Service, Change System BlockはDESセキュアコマンドとして送受信されます。暗号化前の内部ペイロード構造を以下に示します。
+
+\begin{tblr}[
+        long,
+        caption={Register Issue IDコマンド内部ペイロードのデータ構造},
+        label={table:felica-secure-register-issue-id-command-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考           \\
+    0x00  & 0x08 & 発行ID    & -                \\
+    0x08  & 0x08 & 発行パラメータ & -                \\
+    0x10  & 可変   & パッケージ   & DESで生成された発行パッケージ
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Register Areaコマンド内部ペイロードのデータ構造},
+        label={table:felica-secure-register-area-command-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目     & 値または備考           \\
+    0x00  & 0x02 & エリアコード & リトルエンディアン        \\
+    0x02  & 可変   & パッケージ  & DESで生成された発行パッケージ
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Register Serviceコマンド内部ペイロードのデータ構造},
+        label={table:felica-secure-register-service-command-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考           \\
+    0x00  & 0x02 & サービスコード & リトルエンディアン        \\
+    0x02  & 可変   & パッケージ   & DESで生成された発行パッケージ
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Change System Blockコマンド内部ペイロードのデータ構造},
+        label={table:felica-secure-change-system-block-command-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目 & 値または備考  \\
+    0x00  & 0x00 & なし & ペイロードなし
+\end{tblr}
+
+レスポンス内部ペイロードのデータ構造を以下に示します。
+
+\begin{tblr}[
+        long,
+        caption={Register Issue IDレスポンス内部ペイロードのデータ構造},
+        label={table:felica-secure-register-issue-id-response-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                          \\
+    0x00  & 0x01 & ステータスフラグ1 & 0x00: 正常                        \\
+    0x01  & 0x01 & ステータスフラグ2 & 0x00: 正常                        \\
+    0x02  & 0x02 & 残りブロック数   & ステータスフラグ1が0x00の場合のみ返送。リトルエンディアン
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Register Areaレスポンス内部ペイロードのデータ構造},
+        label={table:felica-secure-register-area-response-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考   \\
+    0x00  & 0x01 & ステータスフラグ1 & 0x00: 正常 \\
+    0x01  & 0x01 & ステータスフラグ2 & 0x00: 正常
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Register Serviceレスポンス内部ペイロードのデータ構造},
+        label={table:felica-secure-register-service-response-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考                          \\
+    0x00  & 0x01 & ステータスフラグ1 & 0x00: 正常                        \\
+    0x01  & 0x01 & ステータスフラグ2 & 0x00: 正常                        \\
+    0x02  & 0x02 & 残りブロック数   & ステータスフラグ1が0x00の場合のみ返送。リトルエンディアン
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Change System Blockレスポンス内部ペイロードのデータ構造},
+        label={table:felica-secure-change-system-block-response-payload-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考   \\
+    0x00  & 0x01 & ステータスフラグ1 & 0x00: 正常 \\
+    0x01  & 0x01 & ステータスフラグ2 & 0x00: 正常
+\end{tblr}
+
+発行パッケージ平文(暗号化前)は16バイトで、各コマンドのフォーマットは以下のとおりです。
+
+\begin{tblr}[
+        long,
+        caption={Register Issue ID用発行パッケージ平文(16バイト)のデータ構造},
+        label={table:felica-register-issue-id-package-plain-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目          & 値または備考     \\
+    0x00  & 0x02 & システムコード     & ビッグエンディアン  \\
+    0x02  & 0x02 & Area0鍵バージョン & リトルエンディアン  \\
+    0x04  & 0x08 & Area0鍵      & -          \\
+    0x0C  & 0x04 & 予約領域        & 0x00000000
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Register Area用発行パッケージ平文(16バイト)のデータ構造},
+        label={table:felica-register-area-package-plain-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目        & 値または備考    \\
+    0x00  & 0x02 & サービスコード開始 & リトルエンディアン \\
+    0x02  & 0x02 & サービスコード終端 & リトルエンディアン \\
+    0x04  & 0x02 & サイズ       & リトルエンディアン \\
+    0x06  & 0x02 & 鍵バージョン    & リトルエンディアン \\
+    0x08  & 0x08 & エリア鍵      & -
+\end{tblr}
+
+\begin{tblr}[
+        long,
+        caption={Register Service用発行パッケージ平文(16バイト)のデータ構造},
+        label={table:felica-register-service-package-plain-structure},
+    ]{
+        colspec={|r|r|l|X|},
+        rowhead=1,
+        row{1}={c,m},
+        vlines,
+        hlines,
+    }
+    オフセット & 長さ   & 項目      & 値または備考    \\
+    0x00  & 0x02 & サービスコード & リトルエンディアン \\
+    0x02  & 0x02 & 予約領域    & 0x0000    \\
+    0x04  & 0x02 & サイズ     & リトルエンディアン \\
+    0x06  & 0x02 & 鍵バージョン  & リトルエンディアン \\
+    0x08  & 0x08 & サービス鍵   & -
+\end{tblr}
+
+\subsection{発行パッケージ作成アルゴリズム}
+
+パッケージ鍵を$K_{\mathrm{pkg}}$、平文パッケージを$P$とします($|P|$は8の倍数、かつ0でないことが条件です)。
+
+\begin{itemize}
+    \item MAC生成鍵を
+          \[
+              K_{\mathrm{macpkg}} = K_{\mathrm{pkg}} \oplus 0xFF\ldots FF
+          \]
+          で作成します。
+    \item
+          \[
+              C = \mathrm{DES\mbox{-}CBC}_{IV=0,K_{\mathrm{macpkg}}}(P)
+          \]
+          を計算し、最終8バイトを$MAC_{\mathrm{pkg}}$とします。
+    \item
+          \[
+              Package = \mathrm{DES\mbox{-}CBC}_{IV=0,K_{\mathrm{pkg}}}(P\ \|\ MAC_{\mathrm{pkg}})
+          \]
+          を計算し、この暗号文をコマンドの「パッケージ」フィールドに格納します。
+\end{itemize}
+
+\printbibliography[title={参考文献}]
+
+\end{document}
