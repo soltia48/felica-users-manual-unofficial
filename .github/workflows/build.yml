@@ -1,5 +1,10 @@
 name: Build LaTeX document
-on: [push]
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
 jobs:
   build_latex:
     runs-on: ubuntu-latest
@@ -23,3 +28,36 @@ jobs:
         with:
           name: card_usersmanual-${{ matrix.language }}
           path: ${{ matrix.language }}/card_usersmanual.pdf
+
+  release:
+    needs: build_latex
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download PDF files
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect release assets
+        run: |
+          mkdir -p release
+          for language in ja en; do
+            cp "artifacts/card_usersmanual-${language}/card_usersmanual.pdf" \
+               "release/card_usersmanual-${language}-${GITHUB_REF_NAME}.pdf"
+          done
+          ls -l release
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/*.pdf --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes \
+              release/*.pdf
+          fi
