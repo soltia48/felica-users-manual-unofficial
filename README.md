@@ -1,25 +1,51 @@
-# FeliCa Card Users Manual (Unofficial) / FeliCa カードユーザーズマニュアル (非公式版)
+# FeliCa Card User's Manual (Unofficial Edition)
 
-## Structure / 構成
+An unofficial documentation of the FeliCa Standard specification, written in LaTeX
+and published in Japanese and English.
+
+[日本語版の README](README.ja.md)
+
+## Structure
 
 ```
 .
-├── ja/card_usersmanual.tex   # 日本語版 (ltjsreport, LuaLaTeX)
+├── ja/card_usersmanual.tex   # Japanese edition (ltjsreport, LuaLaTeX)
 ├── en/card_usersmanual.tex   # English edition (report class, LuaLaTeX)
-├── card_usersmanual.bib      # 共有の参考文献データベース / shared bibliography
-├── images/                   # 共有の図版 / shared figures (\graphicspath)
-└── assets/                   # 共有の素材ファイル / shared asset files
+├── card_usersmanual.bib      # Shared bibliography
+├── images/                   # Shared figures (\graphicspath)
+└── assets/                   # Shared asset files
 ```
 
-Both editions share `card_usersmanual.bib`, `images/`, and `assets/`; they reference
-them as `../card_usersmanual.bib` and `../images/`.
+Both editions share `card_usersmanual.bib`, `images/` and `assets/`, and reference
+them as `../card_usersmanual.bib` and `../images/`. The two editions are kept
+structurally identical: they have the same chapters, sections and tables, and the
+same table labels, so that a change to one can be mirrored in the other.
 
-## Build / ビルド
+## Build
 
 ```sh
 cd ja   # or: cd en
 latexmk -lualatex -output-directory=build card_usersmanual.tex
 ```
 
+The document is built with LuaLaTeX. If you do not have a local TeX installation,
+the `texlive/texlive:latest-full` Docker image can be used instead:
+
+```sh
+docker run --rm -v "$PWD":/work -w /work/ja texlive/texlive:latest-full \
+  latexmk -lualatex -output-directory=build card_usersmanual.tex
+```
+
 GitHub Actions builds both editions on every push and uploads them as the
 `card_usersmanual-ja` and `card_usersmanual-en` artifacts.
+
+## Release
+
+Pushing a tag that starts with `v` (for example `v1.0.0`) attaches both PDFs to the
+corresponding GitHub Release as `card_usersmanual-ja-v1.0.0.pdf` and
+`card_usersmanual-en-v1.0.0.pdf`.
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
