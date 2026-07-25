@@ -1,4 +1,12 @@
-\documentclass[a4paper,10.5ptj]{ltjsreport}
+% For PDF (LuaLaTeX) the ltjsreport class is used. tex4ht/make4ht cannot process
+% ltjsreport, so for the HTML build (where \HCode is predefined by tex4ht) fall
+% back to report + luatexja, which produces the same content in HTML.
+\ifdefined\HCode
+  \documentclass[a4paper]{report}
+  \usepackage{luatexja}
+\else
+  \documentclass[a4paper,10.5ptj]{ltjsreport}
+\fi
 
 \usepackage{amsmath}
 \usepackage{graphicx}

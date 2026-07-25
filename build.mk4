@@ -1,0 +1,7 @@
+-- make4ht build file for the HTML editions.
+-- Runs lualatex (via make4ht) with a biber pass in between so that
+-- biblatex citations and the bibliography resolve.
+Make:htlatex()
+Make:biber()
+Make:htlatex()
+Make:htlatex()

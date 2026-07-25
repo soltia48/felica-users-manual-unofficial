@@ -1,0 +1,70 @@
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v4
+
+      - name: Build HTML and PDF for both editions
+        run: |
+          set -eux
+          run_tl() {
+            docker run --rm -v "$PWD":/work -w "/work/$1" \
+              -u "$(id -u):$(id -g)" -e HOME=/tmp \
+              texlive/texlive:latest-full bash -c "$2"
+          }
+          for language in ja en; do
+            # HTML: make4ht cannot process ltjsreport; the source falls back to
+            # report + luatexja when tex4ht defines \HCode.
+            run_tl "$language" "make4ht -ul -e ../build.mk4 -d build-html card_usersmanual.tex"
+            # PDF
+            run_tl "$language" "latexmk -lualatex -interaction=nonstopmode -output-directory=build card_usersmanual.tex"
+          done
+
+      - name: Assemble site
+        run: |
+          set -eux
+          mkdir -p site
+          cp web/index.html site/index.html
+          for language in ja en; do
+            mkdir -p "site/${language}"
+            # HTML page (served at /<lang>/), stylesheet and math images
+            cp "${language}/build-html/card_usersmanual.html" "site/${language}/index.html"
+            cp "${language}/build-html/card_usersmanual.css" "site/${language}/"
+            cp "${language}"/build-html/*.png "site/${language}/" 2>/dev/null || true
+            # PDF for download
+            cp "${language}/build/card_usersmanual.pdf" "site/${language}/card_usersmanual.pdf"
+          done
+          ls -R site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -21,6 +21,10 @@ them as `../card_usersmanual.bib` and `../images/`. The two editions are kept
 structurally identical: they have the same chapters, sections and tables, and the
 same table labels, so that a change to one can be mirrored in the other.
 
+`web/index.html` is the landing page for the published website, and `build.mk4` is
+the [make4ht](https://www.kodymirus.cz/make4ht/) build file used for the HTML
+output.
+
 ## Build
 
 ```sh
@@ -49,3 +53,15 @@ corresponding GitHub Release as `card_usersmanual-ja-v1.0.0.pdf` and
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+## Website
+
+On every push to `main`, both editions are also converted to HTML with `make4ht`
+and published to GitHub Pages together with the PDFs, under `/en/` and `/ja/`.
+Enable it once in the repository settings under **Settings → Pages → Build and
+deployment → Source: GitHub Actions**.
+
+For the Japanese edition, `make4ht` cannot process the `ltjsreport` class, so the
+source selects `report` + `luatexja` when it detects that it is being run by
+tex4ht (`\ifdefined\HCode`), and keeps `ltjsreport` for the PDF build. Both paths
+use LuaLaTeX, so the content stays single-source.

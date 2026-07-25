@@ -19,6 +19,9 @@ FeliCa Standardの仕様をLaTeXで文書化した非公式のマニュアルで
 および `../images/` として参照しています。両版は章・節・表の構成と表のラベル名を一致
 させてあるため、一方への変更をもう一方へ反映しやすくなっています。
 
+`web/index.html` は公開Webサイトのランディングページ、`build.mk4` はHTML出力に使う
+[make4ht](https://www.kodymirus.cz/make4ht/) のビルドファイルです。
+
 ## ビルド
 
 ```sh
@@ -47,3 +50,14 @@ GitHub Releaseに添付されます。
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+## Webサイト
+
+`main` へのpushごとに、両版は `make4ht` でHTMLにも変換され、PDFとともにGitHub Pages
+へ公開されます (`/en/`・`/ja/`)。初回のみリポジトリの
+**Settings → Pages → Build and deployment → Source: GitHub Actions** で有効化して
+ください。
+
+日本語版は `make4ht` が `ltjsreport` クラスを処理できないため、tex4htによる実行を
+検出したとき (`\ifdefined\HCode`) は `report` + `luatexja` を選択し、PDFビルドでは
+`ltjsreport` を使います。どちらもLuaLaTeXを用いるため、内容は単一ソースのままです。

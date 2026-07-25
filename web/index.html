@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FeliCa Card User's Manual (Unofficial Edition)</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #666;
+    --card: #f4f4f5;
+    --border: #dddde0;
+    --accent: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d;
+      --fg: #e6e6e6;
+      --muted: #9aa0a6;
+      --card: #21242b;
+      --border: #33373f;
+      --accent: #6ea8fe;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans",
+                 "Noto Sans JP", sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 { font-size: 1.6rem; margin: 0 0 0.25rem; }
+  .sub { color: var(--muted); margin: 0 0 2.5rem; }
+  .editions {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 34rem) {
+    .editions { grid-template-columns: 1fr 1fr; }
+  }
+  .card {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 12px;
+    padding: 1.25rem 1.25rem 1.1rem;
+  }
+  .card h2 { margin: 0 0 0.75rem; font-size: 1.2rem; }
+  .links a {
+    display: inline-block;
+    margin-right: 1rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .links a:hover { text-decoration: underline; }
+  footer {
+    margin-top: 3rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>FeliCa Card User's Manual<br>(Unofficial Edition)</h1>
+  <p class="sub">FeliCa カードユーザーズマニュアル (非公式版)</p>
+
+  <div class="editions">
+    <section class="card">
+      <h2>English</h2>
+      <p class="links">
+        <a href="en/">Read online (HTML)</a>
+        <a href="en/card_usersmanual.pdf">PDF</a>
+      </p>
+    </section>
+    <section class="card">
+      <h2>日本語</h2>
+      <p class="links">
+        <a href="ja/">オンラインで読む (HTML)</a>
+        <a href="ja/card_usersmanual.pdf">PDF</a>
+      </p>
+    </section>
+  </div>
+
+  <footer>
+    Generated from LaTeX sources. Source code on
+    <a href="https://github.com/soltia48/felica-users-manual-unofficial">GitHub</a>.
+  </footer>
+</main>
+</body>
+</html>
