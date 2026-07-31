@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "FeliCa Card User's Manual (Unofficial Edition)"
+authors:
+  - family-names: Kirishiki
+    given-names: Yudai
+    affiliation: "Unknown Technologies Inc."
+version: 1.0.0
+repository-code: "https://github.com/soltia48/felica-users-manual-unofficial"
+url: "https://github.com/soltia48/felica-users-manual-unofficial"
+license: MIT
+date-released: "2026-07-24"
+preferred-citation:
+  type: manual
+  title: "FeliCa Card User's Manual (Unofficial Edition)"
+  authors:
+    - family-names: Kirishiki
+      given-names: Yudai
+      affiliation: "Unknown Technologies Inc."
+  version: 1.0.0
+  year: 2026
+  url: "https://github.com/soltia48/felica-users-manual-unofficial"

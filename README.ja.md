@@ -61,3 +61,24 @@ git push origin v1.0.0
 日本語版は `make4ht` が `ltjsreport` クラスを処理できないため、tex4htによる実行を
 検出したとき (`\ifdefined\HCode`) は `report` + `luatexja` を選択し、PDFビルドでは
 `ltjsreport` を使います。どちらもLuaLaTeXを用いるため、内容は単一ソースのままです。
+
+## 引用
+
+本文書を利用する場合は引用してください。GitHubの「Cite this repository」ボタンは
+[`CITATION.cff`](CITATION.cff) を参照します。BibTeXエントリ:
+
+```bibtex
+@manual{felica-users-manual-unofficial,
+  title        = {{FeliCa Card User's Manual (Unofficial Edition)}},
+  author       = {Kirishiki, Yudai},
+  organization = {Unknown Technologies Inc.},
+  version      = {1.0.0},
+  year         = {2026},
+  url          = {https://github.com/soltia48/felica-users-manual-unofficial}
+}
+```
+
+日本語での記載例:
+
+> 切敷裕大 (アンノウン・テクノロジーズ株式会社). FeliCaカードユーザーズマニュアル (非公式版).
+> version 1.0.0. 2026. https://github.com/soltia48/felica-users-manual-unofficial

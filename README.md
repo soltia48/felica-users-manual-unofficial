@@ -65,3 +65,19 @@ For the Japanese edition, `make4ht` cannot process the `ltjsreport` class, so th
 source selects `report` + `luatexja` when it detects that it is being run by
 tex4ht (`\ifdefined\HCode`), and keeps `ltjsreport` for the PDF build. Both paths
 use LuaLaTeX, so the content stays single-source.
+
+## Citation
+
+If you use this work, please cite it. GitHub's "Cite this repository" button reads
+the [`CITATION.cff`](CITATION.cff) file. A BibTeX entry:
+
+```bibtex
+@manual{felica-users-manual-unofficial,
+  title        = {{FeliCa Card User's Manual (Unofficial Edition)}},
+  author       = {Kirishiki, Yudai},
+  organization = {Unknown Technologies Inc.},
+  version      = {1.0.0},
+  year         = {2026},
+  url          = {https://github.com/soltia48/felica-users-manual-unofficial}
+}
+```
